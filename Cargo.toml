@@ -1,0 +1,14 @@
+[package]
+name = "hkscdis-rs"
+description = "A HavokScript 5.1 disassembler written in Rust."
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3"
+repository = "https://github.com/Surasia/hkscdis-rs"
+
+[dependencies]
+bitflags = "2.6.0"
+byteorder = "1.5.0"
+clap = { version = "4.5.16", features = ["derive"] }
+color-print = "0.3.6"
+num_enum = "0.7.3"
