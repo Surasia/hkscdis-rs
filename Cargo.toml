@@ -3,7 +3,8 @@ name = "hkscdis-rs"
 description = "A HavokScript 5.1 disassembler written in Rust."
 version = "0.2.0"
 edition = "2021"
-license = "GPL-3"
+license = "GPL-3.0-only"
+keywords = ["hksc", "hkscdis", "havok", "havokscript", "disassembler"]
 repository = "https://github.com/Surasia/hkscdis-rs"
 
 [dependencies]
