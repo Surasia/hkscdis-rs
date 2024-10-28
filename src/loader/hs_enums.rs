@@ -1,35 +1,27 @@
 use byteorder::{ReadBytesExt, BE};
-use std::{
-    fs::File,
-    io::{BufReader, Read},
-};
+use std::io::BufRead;
 
-#[derive(Debug, Clone)]
+use crate::{common::extensions::{BufReaderExt, Readable}, errors::HkscError};
+
+#[derive(Default)]
+/// Represents an enum in a `HavokScript` file.
 pub struct HSEnum {
+    /// Value of the enum (index).
     pub value: u32,
-    pub length: u32,
+    /// Length of the name of the enum.
+    length: u32,
+    /// Name of the enum.
     pub name: String,
 }
 
-impl HSEnum {
-    pub fn read(reader: &mut BufReader<File>) -> Result<Vec<Self>, std::io::Error> {
-        let count = reader.read_i32::<BE>()?;
-        (0..count)
-            .map(|_| {
-                let value = reader.read_u32::<BE>()?;
-                let length = reader.read_u32::<BE>()?;
-
-                let mut name_buffer = vec![0; length as usize];
-                reader.read_exact(&mut name_buffer)?;
-
-                Ok(HSEnum {
-                    value,
-                    length,
-                    name: String::from_utf8_lossy(&name_buffer)
-                        .trim_end_matches('\0')
-                        .to_string(),
-                })
-            })
-            .collect()
+impl Readable for  HSEnum {
+    fn read<R>(&mut self, reader: &mut R) -> Result<(), HkscError>
+    where
+        R: BufRead + BufReaderExt
+    {
+        self.value = reader.read_u32::<BE>()?;
+        self.length = reader.read_u32::<BE>()?;
+        self.name = reader.read_fixed_string(self.length as usize)?;
+        Ok(())
     }
 }

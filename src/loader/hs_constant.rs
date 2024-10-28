@@ -1,72 +1,75 @@
+use crate::{common::extensions::{BufReaderExt, HeaderReadable}, errors::HkscError};
 use super::{
     hs_header::HSHeader,
     hs_opcodes::HSType,
     hs_reader::{read_number, read_string},
 };
+
 use byteorder::{ReadBytesExt, BE};
+use core::fmt;
 use std::{
-    fs::File,
-    io::{self, BufReader},
+    fmt::{Display, Formatter}, io::BufRead
 };
 
-#[derive(Default, Debug, Clone)]
+
+/// Possible values for a (valid) `HavokScript` constant.
 pub enum HSValue {
-    #[default]
+    /// Null pointer.
     Nil,
+    /// Boolean, usually stored in 32 bits.
     Boolean(bool),
+    /// Data that interacts with engine. Can be either 32 bit or 64 bit.
     LightUserData(u64),
+    /// Regular lua number, stored as a 64 bit float.
     Number(f64),
+    /// Null terminated string.
     String(String),
+    /// 64 bit unsigned integer.
     Ui64(u64),
 }
 
-impl HSValue {
-    pub fn format_value(&self) -> String {
-        match self {
-            HSValue::String(s) => format!("\"{}\"", s),
-            HSValue::Number(n) => format!("{}", n),
-            HSValue::LightUserData(n) => format!("{}", n),
-            HSValue::Ui64(n) => format!("{}", n),
-            HSValue::Boolean(b) => format!("{}", b),
-            HSValue::Nil => "Nil".to_string(),
+#[derive(Default)]
+/// Represents a constant, containing a type and value.
+pub struct HSConstant {
+    /// Type of constant, dictates how it is read
+    pub type_: HSType,
+    /// Value of the constant, mapping to a `HSValue` enum.
+    pub value: Option<HSValue>,
+}
+
+impl Display for HSConstant {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match &self.value {
+            Some(HSValue::String(s)) => write!(f, "\"{s}\""),
+            Some(HSValue::Number(n)) => write!(f, "{n}"),
+            Some(HSValue::LightUserData(n) | HSValue::Ui64(n)) => write!(f, "{n}"),
+            Some(HSValue::Boolean(b)) => write!(f, "{b}"),
+            Some(HSValue::Nil) => write!(f, "nil"),
+            None => write!(f, ""),
         }
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct HSConstant {
-    pub type_: HSType,
-    pub value: Option<HSValue>,
-}
-
-impl HSConstant {
-    pub fn read(&mut self, reader: &mut BufReader<File>, header: &HSHeader) -> io::Result<()> {
+impl HeaderReadable for HSConstant {
+    fn read<R>(&mut self, reader: &mut R, header: &HSHeader) -> Result<(), HkscError>
+    where
+        R: BufRead + BufReaderExt
+    {
         let type_byte = reader.read_u8()?;
-        self.type_ = HSType::try_from(type_byte)
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Unknown type"))?;
+        self.type_ = HSType::try_from(type_byte).map_err(|_| HkscError::UnknownType(type_byte))?;
 
         self.value = match self.type_ {
             HSType::TNIL => Some(HSValue::Nil),
             HSType::TLIGHTUSERDATA => match header.t_size {
-                4 => Some(HSValue::LightUserData(reader.read_u32::<BE>()? as u64)),
+                4 => Some(HSValue::LightUserData(reader.read_u32::<BE>()?.into())),
                 8 => Some(HSValue::LightUserData(reader.read_u64::<BE>()?)),
-                _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Invalid LIGHTUSERDATA type!",
-                    ))
-                }
+                _ => return Err(HkscError::InvalidLightUserDataSize(header.t_size))
             },
             HSType::TBOOLEAN => Some(HSValue::Boolean(reader.read_u8()? != 0)),
             HSType::TSTRING => Some(HSValue::String(read_string(reader, header)?)),
             HSType::TNUMBER => Some(read_number(reader, header)?),
             HSType::TUI64 => Some(HSValue::Ui64(reader.read_u64::<BE>()?)),
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Unknown constant type!",
-                ))
-            }
+            _ => return Err(HkscError::UnsupportedConstantType(type_byte)),
         };
 
         Ok(())

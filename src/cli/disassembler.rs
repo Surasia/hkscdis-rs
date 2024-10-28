@@ -51,7 +51,7 @@ fn print_instruction(function: &HSFunction) {
         for arg in &i.args {
             if arg.mode == HSOpArgMode::CONST {
                 let val =
-                    &function.constants[arg.value as usize].value.as_slice()[0].format_value();
+                    &function.constants[arg.value as usize];
                 cprint!("<bright-cyan>CONST(<bright-cyan><bright-blue>{}<bright-blue><bright-cyan>)<bright-cyan> ", val);
             } else {
                 cprint!(
@@ -67,11 +67,10 @@ fn print_instruction(function: &HSFunction) {
 
 fn print_constants(function: &HSFunction) {
     for c in &function.constants {
-        let value = c.value.as_slice()[0].format_value();
         cprintln!(
             "<yellow>   - {:?}<yellow> <bright-cyan>{}<bright-cyan>",
             c.type_,
-            value,
+            c,
         );
     }
 }
@@ -155,19 +154,16 @@ fn print_function(function: &HSFunction) {
         "<yellow>   - Slot Count: <bright-cyan>{}<bright-cyan>",
         function.slot_count
     );
-    cprintln!(
-        "<yellow>   - Unknown: <bright-cyan>{}<bright-cyan>",
-        function.unknown
-    );
+
 
     if function.instruction_count != 0 {
         cprintln!("<bright-blue>  Instructions:<bright-blue>");
-        print_instruction(function)
+        print_instruction(function);
     }
 
     if function.constant_count != 0 {
         cprintln!("<bright-blue>  Constants:<bright-blue>");
-        print_constants(function)
+        print_constants(function);
     }
 
     if function.has_debug_info {
@@ -193,7 +189,7 @@ fn print_structures(structs: &Vec<HSStructBlock>) {
         for member in &struc.members {
             cprintln!(
                 "<yellow>   - {:?}<yellow> <bright-cyan>{}<bright-cyan>",
-                member.header._type,
+                member.header.type_,
                 member.header.name
             );
         }

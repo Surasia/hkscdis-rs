@@ -1,35 +1,42 @@
+use crate::common::extensions::Readable;
+use crate::errors::HkscError;
+
 use super::hs_opcodes::{
     HSMode, HSOpArgMode, HSOpArgModeA, HSOpArgModeBC, HSOpCode, HSOpMode, OP_TABLE,
 };
 use byteorder::{ReadBytesExt, BE};
-use std::io;
-use std::{fs::File, io::BufReader};
+use std::io::BufRead;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct HSInstructionArg {
     pub mode: HSOpArgMode,
     pub value: u32,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct HSInstruction {
     pub mode: HSOpCode,
     pub args: Vec<HSInstructionArg>,
 }
 
-impl HSInstruction {
-    pub fn read(&mut self, reader: &mut BufReader<File>) -> io::Result<()> {
+impl Readable for HSInstruction {
+    fn read<R>(&mut self, reader: &mut R) -> Result<(), HkscError>
+    where
+        R: BufRead
+    {
         let raw = reader.read_u32::<BE>()?;
         let op_entry = &OP_TABLE[(raw >> 25) as usize];
 
         self.mode = op_entry.op_code.clone();
-        self.read_op_a(raw, op_entry)?;
-        self.read_op_bc(raw, op_entry)?;
+        self.read_op_a(raw, op_entry);
+        self.read_op_bc(raw, op_entry);
 
         Ok(())
     }
+}
 
-    fn read_op_a(&mut self, raw: u32, modes: &HSMode) -> io::Result<()> {
+impl HSInstruction {
+    fn read_op_a(&mut self, raw: u32, modes: &HSMode) {
         let mode = if modes.op_mode_a == HSOpArgModeA::UNUSED {
             HSOpArgMode::NUMBER
         } else {
@@ -38,10 +45,9 @@ impl HSInstruction {
 
         let value = raw & 0xFF;
         self.args.push(HSInstructionArg { mode, value });
-        Ok(())
     }
 
-    fn read_op_abc_b(&mut self, raw: u32, modes: &HSMode) -> io::Result<()> {
+    fn read_op_abc_b(&mut self, raw: u32, modes: &HSMode) {
         let (mode, value) = match modes.op_mode_b {
             HSOpArgModeBC::NUMBER => (HSOpArgMode::NUMBER, (raw >> 17) & 0xFF),
             HSOpArgModeBC::OFFSET => (HSOpArgMode::NUMBER, (raw >> 17) & 0x1FF),
@@ -55,18 +61,12 @@ impl HSInstruction {
                 }
             }
             HSOpArgModeBC::CONST => (HSOpArgMode::CONST, (raw >> 17) & 0xFF),
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Unknown Arg Mode type!",
-                ))
-            }
+            HSOpArgModeBC::UNUSED => (HSOpArgMode::CONST, 0),
         };
         self.args.push(HSInstructionArg { mode, value });
-        Ok(())
     }
 
-    fn read_op_abc_c(&mut self, raw: u32, modes: &HSMode) -> io::Result<()> {
+    fn read_op_abc_c(&mut self, raw: u32, modes: &HSMode) {
         let (mode, value) = match modes.op_mode_c {
             HSOpArgModeBC::NUMBER => (HSOpArgMode::NUMBER, (raw >> 8) & 0xFF),
             HSOpArgModeBC::OFFSET => (HSOpArgMode::NUMBER, (raw >> 8) & 0x1FF),
@@ -80,18 +80,12 @@ impl HSInstruction {
                 }
             }
             HSOpArgModeBC::CONST => (HSOpArgMode::CONST, (raw >> 8) & 0xFF),
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Unknown Arg Mode type!",
-                ))
-            }
+            HSOpArgModeBC::UNUSED => (HSOpArgMode::CONST, 0),  
         };
         self.args.push(HSInstructionArg { mode, value });
-        Ok(())
     }
 
-    fn read_op_non_abc_b(&mut self, raw: u32, modes: &HSMode) -> io::Result<()> {
+    fn read_op_non_abc_b(&mut self, raw: u32, modes: &HSMode) {
         let mut value = (raw >> 8) & 0x1FFFF;
         let mode = match modes.op_mode_b {
             HSOpArgModeBC::NUMBER | HSOpArgModeBC::OFFSET => HSOpArgMode::NUMBER,
@@ -103,21 +97,19 @@ impl HSInstruction {
             value = value.wrapping_sub(0xFFFF);
         }
         self.args.push(HSInstructionArg { mode, value });
-        Ok(())
     }
 
-    fn read_op_bc(&mut self, raw: u32, modes: &HSMode) -> io::Result<()> {
+    fn read_op_bc(&mut self, raw: u32, modes: &HSMode) {
         if modes.op_mode_b != HSOpArgModeBC::UNUSED {
             if modes.op_mode == HSOpMode::ABC {
-                self.read_op_abc_b(raw, modes)?;
+                self.read_op_abc_b(raw, modes);
             } else {
-                self.read_op_non_abc_b(raw, modes)?;
+                self.read_op_non_abc_b(raw, modes);
             }
         }
 
         if modes.op_mode == HSOpMode::ABC && modes.op_mode_c != HSOpArgModeBC::UNUSED {
-            self.read_op_abc_c(raw, modes)?;
+            self.read_op_abc_c(raw, modes);
         }
-        Ok(())
     }
 }
