@@ -1,12 +1,18 @@
-use crate::{common::extensions::{BufReaderExt, HeaderReadable}, errors::HkscError};
 use super::{
     hs_constant::HSConstant, hs_debug::HSFunctionDebugInfo, hs_header::HSHeader,
     hs_instruction::HSInstruction,
 };
+use crate::{
+    common::errors::HkscError,
+    common::extensions::{BufReaderExt, HeaderReadable},
+};
 
 use bitflags::bitflags;
 use byteorder::{ReadBytesExt, BE};
-use std::io::{BufRead, Seek, SeekFrom};
+use std::{
+    fmt::Display,
+    io::{BufRead, Seek, SeekFrom},
+};
 
 bitflags! {
     #[derive(Debug, Default)]
@@ -20,6 +26,15 @@ bitflags! {
         const ISVARARG = 2;
         /// Function needs variadic arguments.
         const NEEDSARG = 4;
+    }
+}
+
+impl Display for HSVarArg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.0 .0 == 0 {
+            return write!(f, "NONE");
+        }
+        write!(f, "{:?}", self.0)
     }
 }
 
@@ -60,7 +75,7 @@ pub struct HSFunction {
 impl HeaderReadable for HSFunction {
     fn read<R>(&mut self, reader: &mut R, header: &HSHeader) -> Result<(), HkscError>
     where
-        R: BufRead + Seek + BufReaderExt
+        R: BufRead + Seek + BufReaderExt,
     {
         self.up_value_count = reader.read_u32::<BE>()?;
         self.param_count = reader.read_u32::<BE>()?;
@@ -74,9 +89,11 @@ impl HeaderReadable for HSFunction {
         let aligned_pos = (current_pos + 3) & !3;
         reader.seek(SeekFrom::Start(aligned_pos))?;
 
-        self.instructions = reader.read_enumerable::<HSInstruction>(self.instruction_count.into())?;
+        self.instructions =
+            reader.read_enumerable::<HSInstruction>(self.instruction_count.into())?;
         self.constant_count = reader.read_u32::<BE>()?;
-        self.constants = reader.read_header_enumerable::<HSConstant>(self.constant_count.into(), header)?;
+        self.constants =
+            reader.read_header_enumerable::<HSConstant>(self.constant_count.into(), header)?;
         self.has_debug_info = reader.read_u32::<BE>()? != 0;
 
         if self.has_debug_info {
@@ -84,7 +101,8 @@ impl HeaderReadable for HSFunction {
         };
 
         self.function_count = reader.read_u32::<BE>()?;
-        self.child_functions = reader.read_header_enumerable::<HSFunction>(self.function_count.into(), header)?;
+        self.child_functions =
+            reader.read_header_enumerable::<HSFunction>(self.function_count.into(), header)?;
         self.function_offset = reader.stream_position()?;
         Ok(())
     }

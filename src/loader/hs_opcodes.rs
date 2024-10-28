@@ -1,5 +1,6 @@
 use num_enum::TryFromPrimitive;
 
+/// Small helper macro to create a `HSMode` struct.
 macro_rules! hs_mode {
     ($op:ident, $mode:ident, $a:ident, $b:ident, $c:ident) => {
         HSMode {
@@ -12,6 +13,7 @@ macro_rules! hs_mode {
     };
 }
 
+/// Enum representing `HavokScript` operation codes
 #[derive(Debug, TryFromPrimitive, Clone, Default, Eq, PartialEq)]
 #[repr(u8)]
 pub enum HSOpCode {
@@ -111,6 +113,7 @@ pub enum HSOpCode {
     NumOpcodes,
 }
 
+/// Enum representing `HavokScript` data types
 #[derive(Debug, TryFromPrimitive, Clone, Default)]
 #[repr(u8)]
 pub enum HSType {
@@ -130,6 +133,7 @@ pub enum HSType {
     TSTRUCT,
 }
 
+/// Enum representing argument modes for `HavokScript` operations
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum HSOpArgMode {
     #[default]
@@ -138,29 +142,33 @@ pub enum HSOpArgMode {
     CONST,
 }
 
+/// Enum representing argument modes for the A field in `HavokScript` operations
 #[derive(Debug, PartialEq, Eq)]
 pub enum HSOpArgModeA {
     UNUSED,
     REG,
 }
 
+/// Enum representing operation modes in `HavokScript`
 #[derive(Debug, PartialEq, Eq)]
 pub enum HSOpMode {
-    ABC,
-    ABX,
-    ASBX,
+    ABC,  // Operation with three fields: A, B, and C
+    ABX,  // Operation with two fields: A and BX
+    ASBX, // Operation with two fields: A and signed BX
 }
 
+/// Enum representing argument modes for B and C fields in `HavokScript` operations
 #[derive(Debug, PartialEq, Eq)]
 pub enum HSOpArgModeBC {
-    UNUSED,
-    NUMBER,
-    OFFSET,
-    REG,
-    REGCONST,
-    CONST,
+    UNUSED,   // Unused argument
+    NUMBER,   // Argument is a number
+    OFFSET,   // Argument is an offset
+    REG,      // Argument is a register
+    REGCONST, // Argument is either a register or constant
+    CONST,    // Argument is a constant
 }
 
+/// Struct representing a complete `HavokScript` operation mode
 pub struct HSMode {
     pub op_code: HSOpCode,
     pub op_mode: HSOpMode,
@@ -169,8 +177,6 @@ pub struct HSMode {
     pub op_mode_c: HSOpArgModeBC,
 }
 
-// What's this abomination? Well its a constant and it'll get optimized into just regular data.
-// This is surprisingly cheaper than a JSON lookup or similar. Which is why i'll use it.
 pub const OP_TABLE: [HSMode; 92] = [
     hs_mode!(GetField, ABC, REG, REG, CONST),
     hs_mode!(Test, ABC, REG, UNUSED, NUMBER),

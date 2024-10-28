@@ -1,3 +1,5 @@
+//! Module containing the entire `HavokScript` loader, which parses bytecode through a reader.
+
 pub mod hs;
 pub mod hs_constant;
 pub mod hs_debug;

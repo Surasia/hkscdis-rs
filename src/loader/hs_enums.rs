@@ -1,7 +1,10 @@
 use byteorder::{ReadBytesExt, BE};
 use std::io::BufRead;
 
-use crate::{common::extensions::{BufReaderExt, Readable}, errors::HkscError};
+use crate::{
+    common::errors::HkscError,
+    common::extensions::{BufReaderExt, Readable},
+};
 
 #[derive(Default)]
 /// Represents an enum in a `HavokScript` file.
@@ -14,10 +17,10 @@ pub struct HSEnum {
     pub name: String,
 }
 
-impl Readable for  HSEnum {
+impl Readable for HSEnum {
     fn read<R>(&mut self, reader: &mut R) -> Result<(), HkscError>
     where
-        R: BufRead + BufReaderExt
+        R: BufRead + BufReaderExt,
     {
         self.value = reader.read_u32::<BE>()?;
         self.length = reader.read_u32::<BE>()?;

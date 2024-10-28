@@ -1,10 +1,13 @@
-use crate::{common::extensions::{BufReaderExt, HeaderReadable}, errors::HkscError};
 use super::{
     hs_enums::HSEnum, hs_function::HSFunction, hs_header::HSHeader, hs_structure::HSStructBlock,
 };
+use crate::{
+    common::errors::HkscError,
+    common::extensions::{BufReaderExt, HeaderReadable},
+};
 
-use std::{fs::File, io::BufReader};
 use byteorder::{ReadBytesExt, LE};
+use std::{fs::File, io::BufReader};
 
 #[derive(Default)]
 /// Main container for the Havok Script file.

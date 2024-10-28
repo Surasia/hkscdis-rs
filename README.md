@@ -2,6 +2,12 @@
 
 Rust re-write of my [hksc-disassembler](https://github.com/Surasia/hksc-disassembler) project I wrote to practice rust. Parses and reads HavokScript 5.1 bytecode, outputting it in a human-readable format.
 
+## Installation
+`hkscdis-rs` is available using `cargo`. To install, run the following command:
+```
+cargo install hkscdis-rs
+```
+
 ## Usage
 ```
 A CLI tool to disassemble Havok Script 5.1 files
@@ -12,13 +18,6 @@ Options:
   -p, --path <FILE>
   -h, --help         Print help
 ```
-
-## Dependencies
-- bitflags
-- byteorder
-- clap (with derive)
-- color-print
-- num_enum
 
 ## Credits
 - Soupstream for the amazing [havok-script-tools](https://github.com/soupstream/havok-script-tools), most of which this project is based off of.

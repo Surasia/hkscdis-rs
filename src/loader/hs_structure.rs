@@ -1,34 +1,37 @@
-use crate::{common::extensions::{BufReaderExt, HeaderReadable}, errors::HkscError};
 use super::{
     hs_header::{HSCompatability, HSHeader},
     hs_opcodes::HSType,
     hs_reader::read_string,
+};
+use crate::{
+    common::errors::HkscError,
+    common::extensions::{BufReaderExt, HeaderReadable},
 };
 
 use byteorder::{ReadBytesExt, BE};
 use std::io::BufRead;
 
 #[derive(Default, Debug)]
-/// Header of the structure definition containing info on reading its entries.
-pub struct HSStructHeader {
-    /// Name of the struct.
+/// Information about a structure member's type and metadata
+pub struct HSStructMemberInfo {
+    /// Name of the struct member
     pub name: String,
-    /// Unknown, might be an enum?
+    /// Unknown flags or enum value
     unk0: u32,
-    /// Index of the structure in the entire file.
+    /// Unique identifier for this struct within the file
     struct_id: i32,
-    /// Type of structure (TSTRUCT).
+    /// Type of the struct member (TSTRUCT)
     pub type_: HSType,
-    /// Unknown.
+    /// Unknown value 1
     unk1: u32,
-    /// Unknown.
+    /// Unknown value 2
     unk2: u32,
 }
 
-impl HeaderReadable for HSStructHeader {
+impl HeaderReadable for HSStructMemberInfo {
     fn read<R>(&mut self, reader: &mut R, header: &HSHeader) -> Result<(), HkscError>
     where
-        R: BufRead + BufReaderExt
+        R: BufRead + BufReaderExt,
     {
         self.name = read_string(reader, header)?;
         self.unk0 = reader.read_u32::<BE>()?;
@@ -42,15 +45,18 @@ impl HeaderReadable for HSStructHeader {
 }
 
 #[derive(Default, Debug)]
+/// A member of a structure, containing type information and an index
 pub struct HSStructMember {
-    pub header: HSStructHeader,
+    /// Type and metadata information for this member
+    pub header: HSStructMemberInfo,
+    /// Index of this member within its parent structure
     index: i32,
 }
 
 impl HeaderReadable for HSStructMember {
     fn read<R>(&mut self, reader: &mut R, header: &HSHeader) -> Result<(), HkscError>
     where
-        R: BufRead + BufReaderExt
+        R: BufRead + BufReaderExt,
     {
         self.header.read(reader, header)?;
         self.index = reader.read_i32::<BE>()?;
@@ -59,18 +65,24 @@ impl HeaderReadable for HSStructMember {
 }
 
 #[derive(Default, Debug)]
+/// A block containing structure information including members and inheritance
 pub struct HSStructBlock {
-    pub header: HSStructHeader,
+    /// Type and metadata information for this structure block
+    pub header: HSStructMemberInfo,
+    /// Number of members in this structure
     member_count: u32,
+    /// Number of structures this structure extends/inherits from
     extend_count: u32,
+    /// Names of structures that this structure extends/inherits from
     pub extended_structs: Vec<String>,
+    /// List of structure members
     pub members: Vec<HSStructMember>,
 }
 
 impl HeaderReadable for HSStructBlock {
     fn read<R>(&mut self, reader: &mut R, header: &HSHeader) -> Result<(), HkscError>
     where
-        R: BufRead + BufReaderExt
+        R: BufRead + BufReaderExt,
     {
         self.header.read(reader, header)?;
         self.member_count = reader.read_u32::<BE>()?;
@@ -81,7 +93,8 @@ impl HeaderReadable for HSStructBlock {
                 .collect::<Result<Vec<_>, HkscError>>()?;
         }
 
-        self.members = reader.read_header_enumerable::<HSStructMember>(self.member_count.into(), header)?;
+        self.members =
+            reader.read_header_enumerable::<HSStructMember>(self.member_count.into(), header)?;
 
         Ok(())
     }

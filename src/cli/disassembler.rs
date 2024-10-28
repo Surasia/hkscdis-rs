@@ -2,6 +2,7 @@ use crate::loader::{
     hs::HavokScriptFile, hs_debug::HSFunctionDebugInfo, hs_enums::HSEnum, hs_function::HSFunction,
     hs_header::HSHeader, hs_opcodes::HSOpArgMode, hs_structure::HSStructBlock,
 };
+
 use color_print::{cprint, cprintln};
 
 fn print_header(header: &HSHeader) {
@@ -30,9 +31,10 @@ fn print_header(header: &HSHeader) {
         header.is_integer
     );
     cprintln!(
-        "<yellow>- Extensions:<yellow> <bright-cyan>{:?}<bright-cyan>",
+        "<yellow>- Extensions:<yellow> <bright-cyan>{}<bright-cyan>",
         header.compatability
     );
+    println!();
 }
 
 fn print_enums(enums: &Vec<HSEnum>) {
@@ -43,15 +45,16 @@ fn print_enums(enums: &Vec<HSEnum>) {
             item.value
         );
     }
+    println!();
 }
 
+#[allow(clippy::cast_sign_loss)]
 fn print_instruction(function: &HSFunction) {
     for i in &function.instructions {
         cprint!("<yellow>   - {:?}: <yellow>", i.mode);
         for arg in &i.args {
             if arg.mode == HSOpArgMode::CONST {
-                let val =
-                    &function.constants[arg.value as usize];
+                let val = &function.constants[arg.value as usize];
                 cprint!("<bright-cyan>CONST(<bright-cyan><bright-blue>{}<bright-blue><bright-cyan>)<bright-cyan> ", val);
             } else {
                 cprint!(
@@ -147,14 +150,13 @@ fn print_function(function: &HSFunction) {
         function.param_count
     );
     cprintln!(
-        "<yellow>   - Variable Argument Type: <bright-cyan>{:?}<bright-cyan>",
+        "<yellow>   - Variadic Argument Type: <bright-cyan>{}<bright-cyan>",
         function.var_arg
     );
     cprintln!(
         "<yellow>   - Slot Count: <bright-cyan>{}<bright-cyan>",
         function.slot_count
     );
-
 
     if function.instruction_count != 0 {
         cprintln!("<bright-blue>  Instructions:<bright-blue>");
@@ -176,13 +178,16 @@ fn print_function(function: &HSFunction) {
 
 fn print_structures(structs: &Vec<HSStructBlock>) {
     for struc in structs {
-        cprintln!(
-            "<yellow>-<yellow> <bright-blue>{}<bright-blue>:",
+        cprint!(
+            "<yellow>-<yellow> <bright-blue>{}<bright-blue>",
             struc.header.name
         );
+        if struc.extended_structs.is_empty() {
+            cprintln!("<bright-blue>:<bright-blue>");
+        }
         for extend in &struc.extended_structs {
             cprintln!(
-                "<yellow>- Extends: <yellow> <bright-blue>{}<bright-blue>:",
+                "<green> EXTENDS<green> <bright-blue>{}<bright-blue>:",
                 extend
             );
         }
@@ -196,13 +201,11 @@ fn print_structures(structs: &Vec<HSStructBlock>) {
     }
 }
 
-pub fn disassemble(file: &HavokScriptFile) {
+pub fn print_disassembly(file: &HavokScriptFile) {
     cprintln!("<green>{}<green>", "[Header]");
     print_header(&file.header);
-    println!();
     cprintln!("<green>{}<green>", "[Enums]");
     print_enums(&file.enums);
-    println!();
     cprintln!("<green>{}<green>", "[Functions]");
     print_function(&file.main_function);
     for function in &file.main_function.child_functions {

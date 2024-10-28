@@ -1,9 +1,8 @@
 use std::{num::TryFromIntError, string::FromUtf8Error};
-
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-/// Common errors that can occur in hkscdis-rs.
+/// Common errors that can occur in `hkscdis-rs`.
 pub enum HkscError {
     #[error("Unknown type: {0}!")]
     /// This error occurs when an unknown type (outside of `HSType`) is found.
@@ -31,5 +30,17 @@ pub enum HkscError {
     InvalidStringSize(u8),
     #[error("Integer overflow!")]
     /// This error occurs when an integer cast overflows.
-    TryFromInt(#[from] TryFromIntError)
+    TryFromInt(#[from] TryFromIntError),
+    #[error("Incorrect magic number: {0}, expected 1635077147!")]
+    /// This error occurs when the magic number in the header is incorrect. (Not 1635077147)
+    IncorrectMagicNumber(u32),
+    #[error("Incorrect version number: {0}, expected 81!")]
+    /// This error occurs when the version number in the header is incorrect. (Not 0x51)
+    IncorrectVersionNumber(u8),
+    #[error("Incorrect format number: {0}, expected 14!")]
+    /// This error occurs when the format number in the header is incorrect. (Not 14)
+    IncorrectFormatNumber(u8),
+    #[error("Unsupported endianness: Little Endian")]
+    /// This error occurs when a little endian file is found, which is currently not supported.
+    UnsupportedEndianness,
 }

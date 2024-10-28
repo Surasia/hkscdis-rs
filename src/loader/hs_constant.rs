@@ -1,16 +1,18 @@
-use crate::{common::extensions::{BufReaderExt, HeaderReadable}, errors::HkscError};
 use super::{
     hs_header::HSHeader,
     hs_opcodes::HSType,
     hs_reader::{read_number, read_string},
 };
-
-use byteorder::{ReadBytesExt, BE};
-use core::fmt;
-use std::{
-    fmt::{Display, Formatter}, io::BufRead
+use crate::{
+    common::errors::HkscError,
+    common::extensions::{BufReaderExt, HeaderReadable},
 };
 
+use byteorder::{ReadBytesExt, BE};
+use std::{
+    fmt::{Display, Formatter},
+    io::BufRead,
+};
 
 /// Possible values for a (valid) `HavokScript` constant.
 pub enum HSValue {
@@ -38,7 +40,7 @@ pub struct HSConstant {
 }
 
 impl Display for HSConstant {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match &self.value {
             Some(HSValue::String(s)) => write!(f, "\"{s}\""),
             Some(HSValue::Number(n)) => write!(f, "{n}"),
@@ -53,7 +55,7 @@ impl Display for HSConstant {
 impl HeaderReadable for HSConstant {
     fn read<R>(&mut self, reader: &mut R, header: &HSHeader) -> Result<(), HkscError>
     where
-        R: BufRead + BufReaderExt
+        R: BufRead + BufReaderExt,
     {
         let type_byte = reader.read_u8()?;
         self.type_ = HSType::try_from(type_byte).map_err(|_| HkscError::UnknownType(type_byte))?;
@@ -63,7 +65,7 @@ impl HeaderReadable for HSConstant {
             HSType::TLIGHTUSERDATA => match header.t_size {
                 4 => Some(HSValue::LightUserData(reader.read_u32::<BE>()?.into())),
                 8 => Some(HSValue::LightUserData(reader.read_u64::<BE>()?)),
-                _ => return Err(HkscError::InvalidLightUserDataSize(header.t_size))
+                _ => return Err(HkscError::InvalidLightUserDataSize(header.t_size)),
             },
             HSType::TBOOLEAN => Some(HSValue::Boolean(reader.read_u8()? != 0)),
             HSType::TSTRING => Some(HSValue::String(read_string(reader, header)?)),

@@ -1,36 +1,27 @@
 //! Extensions to `BufReader`.
 //!
-//! Implements `read_fixed_string` and `read_enumerable` that are not present in the regular `BufReader`.
-//! * `read_fixed_string:` Given a buffer and size, reads characters and collects them into a `String` and returns it.
-//! * `read_enumerable:` Reads a type that implements the `Readable` trait, which reads the type `count` times, accumulating the results into a `Vec` of the type. The type to read must be specified as a generic.
+//! Implements additional reading methods for `BufReader`:
+//! * `read_fixed_string`: Reads a fixed-length string from a buffer
+//! * `read_enumerable`: Reads multiple instances of a type that implements `Readable` into a Vec
+//! * `read_header_enumerable`: Reads multiple instances of a type that implements `HeaderReadable` into a Vec
 //!
-//! These functions are implemented as traits in generics. Requires `<Read + Seek>` to be satisfied.
-//!
-use std::io::{BufRead, BufReader, Read, Seek};
+//! These extensions require `Read + Seek` bounds.
 
-use crate::{errors::HkscError, loader::hs_header::HSHeader};
+use crate::{common::errors::HkscError, loader::hs_header::HSHeader};
+
+use std::io::{BufRead, BufReader, Read, Seek};
 
 /// `Readable` trait that ensures a `read` method is declared.
 pub trait Readable {
-    /// Reads data from the given reader and processes it.
-    ///
-    /// # Arguments
-    ///
-    /// * `reader` - A mutable reference to an object that implements `BufRead`, `BufReaderExt`, and `Seek`.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `Result<(), Error>` indicating the success or failure of the read operation.
-    ///
-    /// # Errors
-    ///
-    /// Returns an `Err` containing the error if the read operation fails.
+    /// Reads data from a reader implementing `BufRead`, `BufReaderExt`, and `Seek`.
     fn read<R>(&mut self, reader: &mut R) -> Result<(), HkscError>
     where
         R: BufRead + BufReaderExt + Seek;
 }
 
+/// `HeaderReadable` trait that ensures a `read` method is declared with a `HSHeader` argument.
 pub trait HeaderReadable {
+    /// Reads data from a reader implementing `BufRead`, `BufReaderExt`, and `Seek`, using header information.
     fn read<R>(&mut self, reader: &mut R, header: &HSHeader) -> Result<(), HkscError>
     where
         R: BufRead + BufReaderExt + Seek;
@@ -41,35 +32,13 @@ pub trait BufReaderExt: BufRead
 where
     Self: Seek,
 {
-    /// Reads a fixed-length UTF-8 encoded string from the reader.
-    ///
-    /// This function reads exactly `length` bytes into a UTF-8 string and trims any null bytes found at the end of the string.
+    /// Reads a fixed-length UTF-8 encoded string.
     ///
     /// # Arguments
-    ///
-    /// * `length` - The number of bytes to read.
+    /// * `length` - Number of bytes to read
     ///
     /// # Returns
-    ///
-    /// Returns a `Result<String, Error>` containing the read string.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Ok(String)` if the read operation is successful, or an `Err` containing
-    /// the I/O error if any reading operation fails.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::io::Cursor;
-    /// use std::io::BufReader;
-    /// use infinite_rs::common::extensions::BufReaderExt;
-    ///
-    /// let data = b"I love cats!";
-    /// let mut reader = BufReader::new(Cursor::new(data));
-    /// let string = reader.read_fixed_string(data.len()).unwrap();
-    /// assert_eq!(string, "I love cats!");
-    /// ```
+    /// The read string on success, or an error on failure
     fn read_fixed_string(&mut self, length: usize) -> Result<String, HkscError> {
         let mut buffer = vec![0; length];
         self.read_exact(&mut buffer)?;
@@ -83,54 +52,13 @@ where
         Ok(string)
     }
 
-    /// Reads an enumerable type, accumulating the results into a vector of the same type.
-    ///
-    /// This function reads a type implementing the `Readable` trait `count` times.
+    /// Reads multiple instances of a type into a Vec.
     ///
     /// # Arguments
-    ///
-    /// * `count` - The number of times to read the specified type.
+    /// * `count` - Number of instances to read
     ///
     /// # Returns
-    ///
-    /// Returns a `Result<Vec<T>, Error>` containing the accumulated results.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Ok(Vec<T>)` if the read operation is successful, or an `Err` containing
-    /// the I/O error if any reading operation fails.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::io::{Cursor, BufReader, BufRead, Seek};
-    /// use infinite_rs::common::extensions::{BufReaderExt, Readable};
-    /// use infinite_rs::common::errors::Error;
-    /// use byteorder::{ReadBytesExt, LE};
-    ///
-    /// #[derive(Default)]
-    /// struct TestType {
-    ///     value: u32,
-    /// }
-    ///
-    /// impl Readable for TestType {
-    ///     fn read<R>(&mut self, reader: &mut R) -> Result<(), Error>
-    ///     where
-    ///         R: BufRead + BufReaderExt + Seek,
-    ///     {
-    ///         self.value = reader.read_u32::<LE>()?;
-    ///         Ok(())
-    ///     }
-    /// }
-    ///
-    /// let data = b"\x01\x00\x00\x00\x02\x00\x00\x00\x03\x00\x00\x00";
-    /// let mut reader = BufReader::new(Cursor::new(data));
-    /// let enumerables = reader.read_enumerable::<TestType>(3).unwrap();
-    /// assert_eq!(enumerables.len(), 3);
-    /// assert_eq!(enumerables[0].value, 1);
-    /// assert_eq!(enumerables[1].value, 2);
-    /// assert_eq!(enumerables[2].value, 3);
-    /// ```
+    /// Vec of read instances on success, or an error on failure
     fn read_enumerable<T: Default + Readable>(&mut self, count: u64) -> Result<Vec<T>, HkscError>
     where
         Self: Sized,
@@ -146,7 +74,19 @@ where
         Ok(enumerables)
     }
 
-    fn read_header_enumerable<T: Default + HeaderReadable>(&mut self, count: u64, header: &HSHeader) -> Result<Vec<T>, HkscError>
+    /// Reads multiple instances of a type into a Vec, using header information.
+    ///
+    /// # Arguments
+    /// * `count` - Number of instances to read
+    /// * `header` - The `HSHeader` containing format information
+    ///
+    /// # Returns
+    /// Vec of read instances on success, or an error on failure
+    fn read_header_enumerable<T: Default + HeaderReadable>(
+        &mut self,
+        count: u64,
+        header: &HSHeader,
+    ) -> Result<Vec<T>, HkscError>
     where
         Self: Sized,
         Vec<T>: FromIterator<T>,
