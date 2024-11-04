@@ -32,7 +32,7 @@ fn print_header(header: &HSHeader) {
     );
     cprintln!(
         "<yellow>- Extensions:<yellow> <bright-cyan>{}<bright-cyan>",
-        header.compatability
+        header.features
     );
     println!();
 }
@@ -182,13 +182,13 @@ fn print_structures(structs: &Vec<HSStructBlock>) {
             "<yellow>-<yellow> <bright-blue>{}<bright-blue>",
             struc.header.name
         );
-        if struc.extended_structs.is_empty() {
+        if struc.inherited_structs.is_empty() {
             cprintln!("<bright-blue>:<bright-blue>");
         }
-        for extend in &struc.extended_structs {
+        for inherites in &struc.inherited_structs {
             cprintln!(
-                "<green> EXTENDS<green> <bright-blue>{}<bright-blue>:",
-                extend
+                "<green> INHERITED FROM<green> <bright-blue>{}<bright-blue>:",
+                inherites
             );
         }
         for member in &struc.members {

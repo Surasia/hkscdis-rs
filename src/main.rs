@@ -16,12 +16,12 @@ use std::{fs::File, io::BufReader, path::PathBuf};
 /// A CLI tool to disassemble Havok Script 5.1 files
 struct Disassembler {
     #[arg(short, long, value_name = "FILE")]
+    /// File to disassemble.
     path: PathBuf,
 }
 
 fn main() -> Result<(), HkscError> {
     let cli = Disassembler::parse();
-
     let file = File::open(cli.path)?;
     let mut reader = BufReader::new(file);
     let mut havok_script_file = HavokScriptFile::default();

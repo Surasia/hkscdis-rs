@@ -8,11 +8,8 @@ use crate::{
 };
 
 use bitflags::bitflags;
-use byteorder::{ReadBytesExt, BE};
-use std::{
-    fmt::Display,
-    io::{BufRead, Seek, SeekFrom},
-};
+use byteorder::{ByteOrder, ReadBytesExt};
+use std::{fmt::Display, io::SeekFrom};
 
 bitflags! {
     #[derive(Debug, Default)]
@@ -50,10 +47,8 @@ pub struct HSFunction {
     pub var_arg: HSVarArg,
     /// Number of slots (registers) required for the function.
     pub slot_count: u32,
-    /// Unknown value.
-    unknown: u32,
     /// Number of instructions in the function.
-    pub instruction_count: u32,
+    pub instruction_count: u64,
     /// Instructions in the function.
     pub instructions: Vec<HSInstruction>,
     /// Number of constants in the function.
@@ -73,36 +68,34 @@ pub struct HSFunction {
 }
 
 impl HeaderReadable for HSFunction {
-    fn read<R>(&mut self, reader: &mut R, header: &HSHeader) -> Result<(), HkscError>
-    where
-        R: BufRead + Seek + BufReaderExt,
-    {
-        self.up_value_count = reader.read_u32::<BE>()?;
-        self.param_count = reader.read_u32::<BE>()?;
+    fn read<T: ByteOrder>(
+        &mut self,
+        reader: &mut impl BufReaderExt,
+        header: &HSHeader,
+    ) -> Result<(), HkscError> {
+        self.up_value_count = reader.read_u32::<T>()?;
+        self.param_count = reader.read_u32::<T>()?;
         self.var_arg = HSVarArg::from_bits_truncate(reader.read_u8()?);
-        self.slot_count = reader.read_u32::<BE>()?;
-        self.unknown = reader.read_u32::<BE>()?;
-        self.instruction_count = reader.read_u32::<BE>()?;
+        self.slot_count = reader.read_u32::<T>()?;
+        self.instruction_count = reader.read_u64::<T>()?;
 
         // This aligns the reader to the next 4 byte boundary.
         let current_pos = reader.stream_position()?;
-        let aligned_pos = (current_pos + 3) & !3;
+        let instruction_size = u64::from(header.instruction_size); // I hate rust.
+        let aligned_pos = (current_pos + (instruction_size - 1)) & !(instruction_size - 1);
         reader.seek(SeekFrom::Start(aligned_pos))?;
 
-        self.instructions =
-            reader.read_enumerable::<HSInstruction>(self.instruction_count.into())?;
-        self.constant_count = reader.read_u32::<BE>()?;
+        self.instructions = reader.read_enumerable::<HSInstruction, T>(self.instruction_count)?;
+        self.constant_count = reader.read_u32::<T>()?;
         self.constants =
-            reader.read_header_enumerable::<HSConstant>(self.constant_count.into(), header)?;
-        self.has_debug_info = reader.read_u32::<BE>()? != 0;
-
+            reader.read_header_enumerable::<HSConstant, T>(self.constant_count.into(), header)?;
+        self.has_debug_info = reader.read_u32::<T>()? != 0;
         if self.has_debug_info {
-            self.debug_info.read(reader, header)?;
+            self.debug_info.read::<T>(reader, header)?;
         };
-
-        self.function_count = reader.read_u32::<BE>()?;
+        self.function_count = reader.read_u32::<T>()?;
         self.child_functions =
-            reader.read_header_enumerable::<HSFunction>(self.function_count.into(), header)?;
+            reader.read_header_enumerable::<HSFunction, T>(self.function_count.into(), header)?;
         self.function_offset = reader.stream_position()?;
         Ok(())
     }

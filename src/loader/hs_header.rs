@@ -7,10 +7,10 @@ use std::{fmt::Display, fs::File, io::BufReader};
 bitflags! {
     #[derive(Debug, Default)]
     /// Flags for enabling `HavokScript` features, such as global memoization.
-    pub struct HSCompatability: u8 {
+    pub struct HSFeatures: u8 {
         /// Enable memoization.
         const MEMOIZATION = 1 << 0;
-        /// Enable extended (inherited) structures.
+        /// Enables havok structures, creating in lua using `hmake`.
         const STRUCTURES = 1 << 1;
         /// Enable self references.
         const SELF = 1 << 2;
@@ -21,7 +21,7 @@ bitflags! {
     }
 }
 
-impl Display for HSCompatability {
+impl Display for HSFeatures {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "[")?;
         let mut first = true;
@@ -62,7 +62,7 @@ pub struct HSHeader {
     /// Whether to use integer or floats for numbers.
     pub is_integer: bool,
     /// Feature flags for the file.
-    pub compatability: HSCompatability,
+    pub features: HSFeatures,
     /// Unknown?
     pub shared: u8,
     /// Count of enums to read.
@@ -84,18 +84,18 @@ impl HSHeader {
             return Err(HkscError::IncorrectFormatNumber(self.fmt));
         }
         self.is_little_endian = reader.read_u8()? != 0;
-        if self.is_little_endian {
-            return Err(HkscError::UnsupportedEndianness);
-        }
-
         self.int_size = reader.read_u8()?;
         self.t_size = reader.read_u8()?;
         self.instruction_size = reader.read_u8()?;
         self.number_size = reader.read_u8()?;
         self.is_integer = reader.read_u8()? != 0;
-        self.compatability = HSCompatability::from_bits_truncate(reader.read_u8()?);
+        self.features = HSFeatures::from_bits_truncate(reader.read_u8()?);
         self.shared = reader.read_u8()?;
-        self.enum_count = reader.read_u32::<BE>()?;
+        if self.is_little_endian {
+            self.enum_count = reader.read_u32::<LE>()?;
+        } else {
+            self.enum_count = reader.read_u32::<BE>()?;
+        }
         Ok(())
     }
 }

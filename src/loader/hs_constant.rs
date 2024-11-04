@@ -8,11 +8,8 @@ use crate::{
     common::extensions::{BufReaderExt, HeaderReadable},
 };
 
-use byteorder::{ReadBytesExt, BE};
-use std::{
-    fmt::{Display, Formatter},
-    io::BufRead,
-};
+use byteorder::{ByteOrder, ReadBytesExt};
+use std::fmt::{Display, Formatter};
 
 /// Possible values for a (valid) `HavokScript` constant.
 pub enum HSValue {
@@ -53,24 +50,25 @@ impl Display for HSConstant {
 }
 
 impl HeaderReadable for HSConstant {
-    fn read<R>(&mut self, reader: &mut R, header: &HSHeader) -> Result<(), HkscError>
-    where
-        R: BufRead + BufReaderExt,
-    {
+    fn read<T: ByteOrder>(
+        &mut self,
+        reader: &mut impl BufReaderExt,
+        header: &HSHeader,
+    ) -> Result<(), HkscError> {
         let type_byte = reader.read_u8()?;
         self.type_ = HSType::try_from(type_byte).map_err(|_| HkscError::UnknownType(type_byte))?;
 
         self.value = match self.type_ {
             HSType::TNIL => Some(HSValue::Nil),
             HSType::TLIGHTUSERDATA => match header.t_size {
-                4 => Some(HSValue::LightUserData(reader.read_u32::<BE>()?.into())),
-                8 => Some(HSValue::LightUserData(reader.read_u64::<BE>()?)),
+                4 => Some(HSValue::LightUserData(reader.read_u32::<T>()?.into())),
+                8 => Some(HSValue::LightUserData(reader.read_u64::<T>()?)),
                 _ => return Err(HkscError::InvalidLightUserDataSize(header.t_size)),
             },
             HSType::TBOOLEAN => Some(HSValue::Boolean(reader.read_u8()? != 0)),
-            HSType::TSTRING => Some(HSValue::String(read_string(reader, header)?)),
-            HSType::TNUMBER => Some(read_number(reader, header)?),
-            HSType::TUI64 => Some(HSValue::Ui64(reader.read_u64::<BE>()?)),
+            HSType::TSTRING => Some(HSValue::String(read_string::<T>(reader, header)?)),
+            HSType::TNUMBER => Some(read_number::<T>(reader, header)?),
+            HSType::TUI64 => Some(HSValue::Ui64(reader.read_u64::<T>()?)),
             _ => return Err(HkscError::UnsupportedConstantType(type_byte)),
         };
 

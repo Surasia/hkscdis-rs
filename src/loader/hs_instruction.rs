@@ -1,11 +1,10 @@
 use super::hs_opcodes::{
     HSMode, HSOpArgMode, HSOpArgModeA, HSOpArgModeBC, HSOpCode, HSOpMode, OP_TABLE,
 };
-use crate::common::errors::HkscError;
 use crate::common::extensions::Readable;
+use crate::common::{errors::HkscError, extensions::BufReaderExt};
 
-use byteorder::{ReadBytesExt, BE};
-use std::io::BufRead;
+use byteorder::{ByteOrder, ReadBytesExt};
 
 #[derive(Debug)]
 /// Represents a single argument for a `HavokScript` instruction. Each argument has both
@@ -32,11 +31,8 @@ pub struct HSInstruction {
 impl Readable for HSInstruction {
     /// Reads and decodes a single instruction from the bytecode stream.
     /// `HavokScript` instructions are encoded as 32-bit integers in big-endian format.
-    fn read<R>(&mut self, reader: &mut R) -> Result<(), HkscError>
-    where
-        R: BufRead,
-    {
-        let raw = reader.read_i32::<BE>()?;
+    fn read<T: ByteOrder>(&mut self, reader: &mut impl BufReaderExt) -> Result<(), HkscError> {
+        let raw = reader.read_i32::<T>()?;
         // The opcode is stored in the highest 7 bits of the instruction
         #[allow(clippy::cast_sign_loss)]
         let op_entry = &OP_TABLE[(raw as u32 >> 25) as usize];

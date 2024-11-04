@@ -1,12 +1,15 @@
 use super::{
-    hs_enums::HSEnum, hs_function::HSFunction, hs_header::HSHeader, hs_structure::HSStructBlock,
+    hs_enums::HSEnum,
+    hs_function::HSFunction,
+    hs_header::{HSFeatures, HSHeader},
+    hs_structure::HSStructBlock,
 };
 use crate::{
     common::errors::HkscError,
     common::extensions::{BufReaderExt, HeaderReadable},
 };
 
-use byteorder::{ReadBytesExt, LE};
+use byteorder::{ByteOrder, ReadBytesExt, BE, LE};
 use std::{fs::File, io::BufReader};
 
 #[derive(Default)]
@@ -28,20 +31,31 @@ pub struct HavokScriptFile {
 impl HavokScriptFile {
     pub fn read(&mut self, reader: &mut BufReader<File>) -> Result<(), HkscError> {
         self.header.read(reader)?;
-        self.enums = reader.read_enumerable::<HSEnum>(self.header.enum_count.into())?;
-        self.main_function.read(reader, &self.header)?;
+        if self.header.is_little_endian {
+            self.enums = reader.read_enumerable::<HSEnum, LE>(self.header.enum_count.into())?;
+            self.main_function.read::<LE>(reader, &self.header)?;
+            reader.seek_relative(4)?;
+            self.read_structures::<LE>(reader)?;
+        } else {
+            self.enums = reader.read_enumerable::<HSEnum, BE>(self.header.enum_count.into())?;
+            self.main_function.read::<BE>(reader, &self.header)?;
+            reader.seek_relative(4)?;
+            self.read_structures::<BE>(reader)?;
+        }
+        Ok(())
+    }
 
-        reader.seek_relative(4)?; // Padding?
-
-        // End of the file is indicated by a u64 with a value of 0, so we loop until we find it,
-        // reading structs as we go
-        while reader.read_u64::<LE>()? != 0 {
+    pub fn read_structures<T: ByteOrder>(
+        &mut self,
+        reader: &mut BufReader<File>,
+    ) -> Result<(), HkscError> {
+        while self.header.features.contains(HSFeatures::STRUCTURES) && reader.read_u64::<T>()? != 0
+        {
             reader.seek_relative(-8)?; // Compensate for the previous read
             let mut structure = HSStructBlock::default();
-            structure.read(reader, &self.header)?;
+            structure.read::<T>(reader, &self.header)?;
             self.structs.push(structure);
         }
-
         Ok(())
     }
 }
