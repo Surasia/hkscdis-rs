@@ -8,6 +8,7 @@
 //! These extensions require `Read + Seek` bounds.
 
 use crate::{common::errors::HkscError, loader::hs_header::HSHeader};
+
 use byteorder::ByteOrder;
 use std::io::{BufRead, BufReader, Read, Seek};
 
@@ -43,12 +44,13 @@ where
         let mut buffer = vec![0; length];
         self.read_exact(&mut buffer)?;
 
-        if buffer == [255, 255, 255, 255] {
-            return Ok(String::new()); // Return empty string if all bytes are 0xFF.
+        // Goes through the string to remove the null terminator
+        // I *guess* iterating through a string is expensive
+        // But we're like 50% limited by IO anyway
+        if let Some(null_pos) = buffer.iter().position(|&x| x == 0) {
+            buffer.truncate(null_pos);
         }
-
         let string = String::from_utf8(buffer)?;
-
         Ok(string)
     }
 
