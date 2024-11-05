@@ -5,8 +5,10 @@ use crate::{
 };
 
 use byteorder::{ByteOrder, ReadBytesExt};
+use colored::Colorize;
+use std::fmt::Display;
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 /// Local variable information for a function.
 pub struct HSFunctionDebugInfoLocals {
     /// Name of the local variable.
@@ -82,6 +84,63 @@ impl HeaderReadable for HSFunctionDebugInfo {
             .map(|_| read_string::<T>(reader, header))
             .collect::<Result<_, _>>()?;
 
+        Ok(())
+    }
+}
+
+impl Display for HSFunctionDebugInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{} {}",
+            "- Line Count:".yellow(),
+            self.line_count.to_string().bright_cyan()
+        )?;
+        writeln!(
+            f,
+            "{} {}",
+            "- Locals Count:".yellow(),
+            self.locals_count.to_string().bright_cyan()
+        )?;
+        writeln!(
+            f,
+            "{} {}",
+            "- Up Value Count:".yellow(),
+            self.up_value_count.to_string().bright_cyan()
+        )?;
+        writeln!(
+            f,
+            "{} {}",
+            "- Line Begin:".yellow(),
+            self.line_begin.to_string().bright_cyan()
+        )?;
+        writeln!(
+            f,
+            "{} {}",
+            "- Line End:".yellow(),
+            self.line_end.to_string().bright_cyan()
+        )?;
+        writeln!(f, "{} {}", "- Path:".yellow(), self.path.bright_cyan())?;
+        writeln!(
+            f,
+            "{} {}",
+            "- Function Name:".yellow(),
+            self.function_name.bright_cyan()
+        )?;
+
+        if self.locals_count != 0 {
+            writeln!(f, "{}", "- Locals:".yellow())?;
+            for local in &self.locals {
+                writeln!(f, "   {}{}", "- ".yellow(), local.local_name.bright_cyan())?;
+            }
+        }
+
+        if self.up_value_count != 0 {
+            writeln!(f, "{}", "- UpValues:".yellow())?;
+            for upvalue in &self.up_values {
+                writeln!(f, "   {}{}", "- ".yellow(), upvalue.bright_cyan())?;
+            }
+        }
         Ok(())
     }
 }

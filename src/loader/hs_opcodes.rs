@@ -14,7 +14,7 @@ macro_rules! hs_mode {
 }
 
 /// Enum representing `HavokScript` operation codes
-#[derive(Debug, TryFromPrimitive, Clone, Default, Eq, PartialEq)]
+#[derive(Debug, TryFromPrimitive, Clone, Default)]
 #[repr(u8)]
 pub enum HSOpCode {
     #[default]
@@ -113,6 +113,12 @@ pub enum HSOpCode {
     NumOpcodes,
 }
 
+impl std::fmt::Display for HSOpCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
 /// Enum representing `HavokScript` data types
 #[derive(Debug, TryFromPrimitive, Clone, Default)]
 #[repr(u8)]
@@ -140,6 +146,12 @@ pub enum HSOpArgMode {
     NUMBER,
     REG,
     CONST,
+}
+
+impl std::fmt::Display for HSOpArgMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
 }
 
 /// Enum representing argument modes for the A field in `HavokScript` operations

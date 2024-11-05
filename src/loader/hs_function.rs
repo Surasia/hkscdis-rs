@@ -1,6 +1,6 @@
 use super::{
     hs_constant::HSConstant, hs_debug::HSFunctionDebugInfo, hs_header::HSHeader,
-    hs_instruction::HSInstruction,
+    hs_instruction::HSInstruction, hs_opcodes::HSOpArgMode,
 };
 use crate::{
     common::errors::HkscError,
@@ -9,10 +9,11 @@ use crate::{
 
 use bitflags::bitflags;
 use byteorder::{ByteOrder, ReadBytesExt};
+use colored::Colorize;
 use std::{fmt::Display, io::SeekFrom};
 
 bitflags! {
-    #[derive(Debug, Default)]
+    #[derive(Default)]
     /// Flag that sets if a function supports variadic arguments.
     pub struct HSVarArg : u8 {
         /// Function has no variadic arguments.
@@ -97,6 +98,98 @@ impl HeaderReadable for HSFunction {
         self.child_functions =
             reader.read_header_enumerable::<HSFunction, T>(self.function_count.into(), header)?;
         self.function_offset = reader.stream_position()?;
+        Ok(())
+    }
+}
+
+impl Display for HSFunction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.has_debug_info && !self.debug_info.function_name.is_empty() {
+            writeln!(
+                f,
+                "{} {}{}",
+                "[Function:".green(),
+                self.debug_info.function_name.bright_cyan(),
+                "]".green()
+            )?;
+        } else {
+            writeln!(
+                f,
+                "{} {}{}",
+                "[Function:".green(),
+                self.function_offset.to_string().bright_cyan(),
+                "]".green()
+            )?;
+        }
+        writeln!(
+            f,
+            "{} {}",
+            "- UpValue Count:".yellow(),
+            self.up_value_count.to_string().bright_cyan()
+        )?;
+        writeln!(
+            f,
+            "{} {}",
+            "- Parameter Count:".yellow(),
+            self.param_count.to_string().bright_cyan()
+        )?;
+        writeln!(
+            f,
+            "{} {}",
+            "- Variadic Argument Type:".yellow(),
+            self.var_arg.to_string().bright_cyan()
+        )?;
+        writeln!(
+            f,
+            "{} {}",
+            "- Slot Count:".yellow(),
+            self.slot_count.to_string().bright_cyan()
+        )?;
+
+        writeln!(f, "{}", "Instructions:".bright_blue())?;
+        for inst in &self.instructions {
+            write!(
+                f,
+                "{} {}{} ",
+                "-".yellow(),
+                inst.mode.to_string().yellow(),
+                ":".yellow()
+            )?;
+            for (i, arg) in inst.args.iter().enumerate() {
+                if i > 0 {
+                    write!(f, " ")?;
+                }
+                match arg.mode {
+                    HSOpArgMode::CONST => {
+                        write!(f, "{}", "CONST(".bright_cyan())?;
+                        #[allow(clippy::cast_sign_loss)]
+                        if let Some(constant) = self.constants.get(arg.value as usize) {
+                            write!(f, "{constant}")?;
+                        }
+                        write!(f, "{}", ")".bright_cyan())?;
+                    }
+                    _ => write!(
+                        f,
+                        "{}{}{}{}",
+                        arg.mode.to_string().bright_cyan(),
+                        "(".bright_cyan(),
+                        arg.value.to_string().bright_blue(),
+                        ")".bright_cyan()
+                    )?,
+                }
+            }
+            writeln!(f)?;
+        }
+
+        if self.has_debug_info {
+            writeln!(f, "{}", "Debug Info:".bright_blue())?;
+            write!(f, "{}", self.debug_info)?;
+        }
+
+        writeln!(f)?;
+        for func in &self.child_functions {
+            write!(f, "{func}")?;
+        }
         Ok(())
     }
 }

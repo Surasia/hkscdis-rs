@@ -2,7 +2,8 @@ use super::{
     hs_enums::HSEnum,
     hs_function::HSFunction,
     hs_header::{HSFeatures, HSHeader},
-    hs_structure::HSStructBlock,
+    hs_reader::read_string,
+    hs_structure::HSStructPrototype,
 };
 use crate::{
     common::errors::HkscError,
@@ -10,7 +11,8 @@ use crate::{
 };
 
 use byteorder::{ByteOrder, ReadBytesExt, BE, LE};
-use std::{fs::File, io::BufReader};
+use colored::Colorize;
+use std::{fmt::Display, fs::File, io::BufReader};
 
 #[derive(Default)]
 /// Main container for the Havok Script file.
@@ -25,22 +27,24 @@ pub struct HavokScriptFile {
     /// This can be an initializer, actual main function, or just the first function.
     pub main_function: HSFunction,
     /// Havok structure definitions that allow interop with game engine.
-    pub structs: Vec<HSStructBlock>,
+    pub structs: Vec<HSStructPrototype>,
 }
 
 impl HavokScriptFile {
-    pub fn read(&mut self, reader: &mut BufReader<File>) -> Result<(), HkscError> {
+    pub fn read(
+        &mut self,
+        reader: &mut BufReader<File>,
+        enable_inheritance: bool,
+    ) -> Result<(), HkscError> {
         self.header.read(reader)?;
         if self.header.is_little_endian {
             self.enums = reader.read_enumerable::<HSEnum, LE>(self.header.enum_count.into())?;
             self.main_function.read::<LE>(reader, &self.header)?;
-            reader.seek_relative(4)?;
-            self.read_structures::<LE>(reader)?;
+            self.read_structures::<LE>(reader, enable_inheritance)?;
         } else {
             self.enums = reader.read_enumerable::<HSEnum, BE>(self.header.enum_count.into())?;
             self.main_function.read::<BE>(reader, &self.header)?;
-            reader.seek_relative(4)?;
-            self.read_structures::<BE>(reader)?;
+            self.read_structures::<BE>(reader, enable_inheritance)?;
         }
         Ok(())
     }
@@ -48,13 +52,48 @@ impl HavokScriptFile {
     pub fn read_structures<T: ByteOrder>(
         &mut self,
         reader: &mut BufReader<File>,
+        enable_inheritance: bool,
     ) -> Result<(), HkscError> {
-        while self.header.features.contains(HSFeatures::STRUCTURES) && reader.read_u64::<T>()? != 0
-        {
-            reader.seek_relative(-8)?; // Compensate for the previous read
-            let mut structure = HSStructBlock::default();
-            structure.read::<T>(reader, &self.header)?;
-            self.structs.push(structure);
+        if self.header.features.contains(HSFeatures::STRUCTURES) {
+            let check = reader.read_u32::<T>()?;
+            if check != 1 {
+                return Ok(());
+            }
+
+            loop {
+                let name = read_string::<T>(reader, &self.header)?;
+                if name.is_empty() {
+                    break;
+                }
+                let mut structure = HSStructPrototype::default();
+                structure.read::<T>(reader, &self.header, enable_inheritance)?;
+                structure.name = name;
+                self.structs.push(structure);
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Display for HavokScriptFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{} \n{}", "[Header]".green(), self.header)?;
+
+        writeln!(f, "{}", "[Enums]".green())?;
+        for item in &self.enums {
+            writeln!(f, "{item}")?;
+        }
+        writeln!(f)?;
+        writeln!(f, "{}", self.main_function)?;
+
+        if !self.structs.is_empty() {
+            for struc in &self.structs {
+                writeln!(f, "{struc}")?;
+                for member in &struc.slots {
+                    writeln!(f, "{} {}", "-".yellow(), member)?;
+                }
+                writeln!(f)?;
+            }
         }
         Ok(())
     }

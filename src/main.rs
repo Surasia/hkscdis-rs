@@ -1,15 +1,17 @@
 #![deny(clippy::pedantic)]
 #![allow(clippy::missing_errors_doc)]
 
-pub mod cli;
 pub mod common;
 pub mod loader;
 
 use crate::common::errors::HkscError;
 use clap::Parser;
-use cli::disassembler::print_disassembly;
 use loader::hs::HavokScriptFile;
-use std::{fs::File, io::BufReader, path::PathBuf};
+use std::{
+    fs::File,
+    io::{BufReader, Write},
+    path::PathBuf,
+};
 
 #[derive(Parser)]
 #[command(name = "Havok Script Disassembler")]
@@ -18,6 +20,15 @@ struct Disassembler {
     #[arg(short, long, value_name = "FILE")]
     /// File to disassemble.
     path: PathBuf,
+    #[arg(short = 'i', long)]
+    /// Enable extensions for structure inheritance.
+    enable_inheritance: bool,
+    #[arg(short = 'c', long, default_value = "false")]
+    /// Disable displaying colors with the disassembly.
+    disable_colors: bool,
+    #[arg(short = 'o', long, value_name = "FILE")]
+    /// Optional output file. If not specified, output goes to stdout.
+    output: Option<PathBuf>,
 }
 
 fn main() -> Result<(), HkscError> {
@@ -26,8 +37,19 @@ fn main() -> Result<(), HkscError> {
     let mut reader = BufReader::new(file);
     let mut havok_script_file = HavokScriptFile::default();
 
-    havok_script_file.read(&mut reader)?;
-    print_disassembly(&havok_script_file);
+    if cli.disable_colors {
+        colored::control::set_override(false);
+    }
 
+    havok_script_file.read(&mut reader, cli.enable_inheritance)?;
+
+    match cli.output {
+        Some(path) => {
+            colored::control::set_override(false); // ANSI escape codes don't work in files
+            let mut output_file = File::create(path)?;
+            write!(output_file, "{havok_script_file}")?;
+        }
+        None => println!("{havok_script_file}"),
+    }
     Ok(())
 }

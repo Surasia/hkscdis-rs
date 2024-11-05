@@ -9,6 +9,7 @@ use crate::{
 };
 
 use byteorder::{ByteOrder, ReadBytesExt};
+use colored::Colorize;
 use std::fmt::{Display, Formatter};
 
 /// Possible values for a (valid) `HavokScript` constant.
@@ -36,19 +37,6 @@ pub struct HSConstant {
     pub value: Option<HSValue>,
 }
 
-impl Display for HSConstant {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        match &self.value {
-            Some(HSValue::String(s)) => write!(f, "\"{s}\""),
-            Some(HSValue::Number(n)) => write!(f, "{n}"),
-            Some(HSValue::LightUserData(n) | HSValue::Ui64(n)) => write!(f, "{n}"),
-            Some(HSValue::Boolean(b)) => write!(f, "{b}"),
-            Some(HSValue::Nil) => write!(f, "nil"),
-            None => write!(f, ""),
-        }
-    }
-}
-
 impl HeaderReadable for HSConstant {
     fn read<T: ByteOrder>(
         &mut self,
@@ -73,5 +61,20 @@ impl HeaderReadable for HSConstant {
         };
 
         Ok(())
+    }
+}
+
+impl Display for HSConstant {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match &self.value {
+            Some(HSValue::String(s)) => write!(f, "{}", s.bright_blue()),
+            Some(HSValue::Number(n)) => write!(f, "{}", n.to_string().bright_blue()),
+            Some(HSValue::LightUserData(n) | HSValue::Ui64(n)) => {
+                write!(f, "{}", n.to_string().bright_blue())
+            }
+            Some(HSValue::Boolean(b)) => write!(f, "{}", b.to_string().bright_blue()),
+            Some(HSValue::Nil) => write!(f, "{}", "nil".bright_blue()),
+            None => write!(f, ""),
+        }
     }
 }

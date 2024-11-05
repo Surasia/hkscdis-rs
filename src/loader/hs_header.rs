@@ -2,10 +2,11 @@ use crate::common::errors::HkscError;
 
 use bitflags::bitflags;
 use byteorder::{ReadBytesExt, BE, LE};
+use colored::Colorize;
 use std::{fmt::Display, fs::File, io::BufReader};
 
 bitflags! {
-    #[derive(Debug, Default)]
+    #[derive(Default)]
     /// Flags for enabling `HavokScript` features, such as global memoization.
     pub struct HSFeatures: u8 {
         /// Enable memoization.
@@ -23,20 +24,20 @@ bitflags! {
 
 impl Display for HSFeatures {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[")?;
+        write!(f, "{}", "[".bright_cyan())?;
         let mut first = true;
         for (name, _) in self.iter_names() {
             if !first {
-                write!(f, ", ")?;
+                write!(f, "{} ", ",".bright_cyan())?;
             }
-            write!(f, "{name}")?;
+            write!(f, "{}", name.bright_cyan())?;
             first = false;
         }
-        write!(f, "]")
+        write!(f, "{}", "]".bright_cyan())
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 /// Header of a `HavokScript` file.
 pub struct HSHeader {
     /// Magic number for script files. (0x61754C1B / "\1BLua")
@@ -46,10 +47,6 @@ pub struct HSHeader {
     /// Format version of the file. (should be 14)
     pub fmt: u8,
     /// Endianness of the file. (0 = big endian, 1 = little endian)
-    ///
-    /// **Important Note:**
-    /// The `is_little_endian` flag is disabled in every bytecode file I have come across.
-    /// I currently do not plan to implement it, so all files are assumed to be big endian.
     pub is_little_endian: bool,
     /// WORD size of target system.
     pub int_size: u8,
@@ -97,5 +94,47 @@ impl HSHeader {
             self.enum_count = reader.read_u32::<BE>()?;
         }
         Ok(())
+    }
+}
+
+impl Display for HSHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{} {}",
+            "- Is Little Endian:".yellow(),
+            self.is_little_endian.to_string().bright_cyan()
+        )?;
+        writeln!(
+            f,
+            "{} {}",
+            "- Integer Size:".yellow(),
+            self.int_size.to_string().bright_cyan()
+        )?;
+        writeln!(
+            f,
+            "{} {}",
+            "- Type Size:".yellow(),
+            self.t_size.to_string().bright_cyan()
+        )?;
+        writeln!(
+            f,
+            "{} {}",
+            "- Instruction Size:".yellow(),
+            self.instruction_size.to_string().bright_cyan()
+        )?;
+        writeln!(
+            f,
+            "{} {}",
+            "- Number Size:".yellow(),
+            self.number_size.to_string().bright_cyan()
+        )?;
+        writeln!(
+            f,
+            "{} {}",
+            "- Is Using Integer:".yellow(),
+            self.is_integer.to_string().bright_cyan()
+        )?;
+        writeln!(f, "{} {}", "- Extensions:".yellow(), self.features)
     }
 }

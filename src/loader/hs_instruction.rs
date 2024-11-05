@@ -1,10 +1,19 @@
 use super::hs_opcodes::{
     HSMode, HSOpArgMode, HSOpArgModeA, HSOpArgModeBC, HSOpCode, HSOpMode, OP_TABLE,
 };
-use crate::common::extensions::Readable;
-use crate::common::{errors::HkscError, extensions::BufReaderExt};
+use crate::common::{errors::HkscError, extensions::BufReaderExt, extensions::Readable};
 
 use byteorder::{ByteOrder, ReadBytesExt};
+
+// Bit masks for instruction parsing
+const OPCODE_MASK: u32 = 0x7F << 25; // Highest 7 bits
+const A_ARG_MASK: i32 = 0xFF; // Lowest 8 bits
+const B_ARG_MASK: i32 = 0xFF << 17; // Bits 17-24
+const B_ARG_EXTMASK: i32 = 0x1FF << 17; // Bits 17-25 (including extension)
+const C_ARG_MASK: i32 = 0xFF << 8; // Bits 8-15
+const C_ARG_EXTMASK: i32 = 0x1FF << 8; // Bits 8-16 (including extension)
+const NON_ABC_B_MASK: i32 = 0x1FFFF << 8; // Bits 8-25 for non-ABC formats
+const REG_CONST_THRESHOLD: i32 = 0x100; // Values >= 256 indicate constants
 
 #[derive(Debug)]
 /// Represents a single argument for a `HavokScript` instruction. Each argument has both
@@ -16,7 +25,7 @@ pub struct HSInstructionArg {
     pub value: i32,
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 /// Represents a single instruction in the `HavokScript` bytecode.
 /// Each instruction consists of an opcode and up to three arguments.
 pub struct HSInstruction {
@@ -33,9 +42,8 @@ impl Readable for HSInstruction {
     /// `HavokScript` instructions are encoded as 32-bit integers in big-endian format.
     fn read<T: ByteOrder>(&mut self, reader: &mut impl BufReaderExt) -> Result<(), HkscError> {
         let raw = reader.read_i32::<T>()?;
-        // The opcode is stored in the highest 7 bits of the instruction
         #[allow(clippy::cast_sign_loss)]
-        let op_entry = &OP_TABLE[(raw as u32 >> 25) as usize];
+        let op_entry = &OP_TABLE[((raw as u32 & OPCODE_MASK) >> 25) as usize];
 
         self.mode = op_entry.op_code.clone();
         self.read_op_a(raw, op_entry);
@@ -55,7 +63,7 @@ impl HSInstruction {
             HSOpArgMode::REG
         };
 
-        let value = raw & 0xFF;
+        let value = raw & A_ARG_MASK;
         self.args.push(HSInstructionArg { mode, value });
     }
 
@@ -70,12 +78,12 @@ impl HSInstruction {
     /// * NUMBER: Raw numeric value
     fn read_op_abc_b(&mut self, raw: i32, modes: &HSMode) {
         let (mode, value) = match modes.op_mode_b {
-            HSOpArgModeBC::NUMBER => (HSOpArgMode::NUMBER, (raw >> 17) & 0xFF),
-            HSOpArgModeBC::OFFSET => (HSOpArgMode::NUMBER, (raw >> 17) & 0x1FF),
-            HSOpArgModeBC::REG => (HSOpArgMode::REG, (raw >> 17) & 0xFF),
+            HSOpArgModeBC::NUMBER => (HSOpArgMode::NUMBER, (raw & B_ARG_MASK) >> 17),
+            HSOpArgModeBC::OFFSET => (HSOpArgMode::NUMBER, (raw & B_ARG_EXTMASK) >> 17),
+            HSOpArgModeBC::REG => (HSOpArgMode::REG, (raw & B_ARG_MASK) >> 17),
             HSOpArgModeBC::REGCONST => {
-                let value = (raw >> 17) & 0x1FF;
-                if value < 0x100 {
+                let value = (raw & B_ARG_EXTMASK) >> 17;
+                if value < REG_CONST_THRESHOLD {
                     // Values below 256 indicate a register reference
                     (HSOpArgMode::REG, value)
                 } else {
@@ -100,12 +108,12 @@ impl HSInstruction {
     /// * NUMBER: Raw numeric value
     fn read_op_abc_c(&mut self, raw: i32, modes: &HSMode) {
         let (mode, value) = match modes.op_mode_c {
-            HSOpArgModeBC::NUMBER => (HSOpArgMode::NUMBER, (raw >> 8) & 0xFF),
-            HSOpArgModeBC::OFFSET => (HSOpArgMode::NUMBER, (raw >> 8) & 0x1FF),
-            HSOpArgModeBC::REG => (HSOpArgMode::REG, (raw >> 8) & 0xFF),
+            HSOpArgModeBC::NUMBER => (HSOpArgMode::NUMBER, (raw & C_ARG_MASK) >> 8),
+            HSOpArgModeBC::OFFSET => (HSOpArgMode::NUMBER, (raw & C_ARG_EXTMASK) >> 8),
+            HSOpArgModeBC::REG => (HSOpArgMode::REG, (raw & C_ARG_MASK) >> 8),
             HSOpArgModeBC::REGCONST => {
-                let value = (raw >> 8) & 0x1FF;
-                if value < 0x100 {
+                let value = (raw & C_ARG_EXTMASK) >> 8;
+                if value < REG_CONST_THRESHOLD {
                     (HSOpArgMode::REG, value)
                 } else {
                     (HSOpArgMode::CONST, value & 0xFF)
@@ -121,7 +129,7 @@ impl HSInstruction {
     /// For these formats, the B argument spans bits 8-25 and is treated as
     /// a single field rather than two separate arguments.
     fn read_op_non_abc_b(&mut self, raw: i32, modes: &HSMode) {
-        let mut value = (raw >> 8) & 0x1FFFF;
+        let mut value = (raw & NON_ABC_B_MASK) >> 8;
         let mode = match modes.op_mode_b {
             HSOpArgModeBC::NUMBER | HSOpArgModeBC::OFFSET => HSOpArgMode::NUMBER,
             HSOpArgModeBC::CONST => HSOpArgMode::CONST,

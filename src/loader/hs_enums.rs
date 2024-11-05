@@ -4,6 +4,8 @@ use crate::{
 };
 
 use byteorder::{ByteOrder, ReadBytesExt};
+use colored::Colorize;
+use std::fmt::Display;
 
 #[derive(Default)]
 /// Represents an enum in a `HavokScript` file.
@@ -22,5 +24,18 @@ impl Readable for HSEnum {
         self.length = reader.read_u32::<T>()?;
         self.name = reader.read_fixed_string::<T>(self.length as usize)?;
         Ok(())
+    }
+}
+
+impl Display for HSEnum {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {}{} {}",
+            "-".yellow(),
+            self.name.yellow(),
+            ":".yellow(),
+            self.value.to_string().bright_cyan()
+        )
     }
 }
