@@ -99,7 +99,7 @@ impl Display for HSStructPrototype {
         if !self.inherited_structs.is_empty() {
             write!(
                 f,
-                "{} {}",
+                " {} {}",
                 "INHERITED FROM".green(),
                 self.inherited_structs.join(", ").bright_cyan()
             )?;
