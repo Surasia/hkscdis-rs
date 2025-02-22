@@ -6,7 +6,7 @@ edition = "2024"
 license = "GPL-3.0-only"
 keywords = ["hksc", "hkscdis", "havok", "havokscript", "disassembler"]
 repository = "https://github.com/Surasia/hkscdis-rs"
-categories = ["reverse-engineering", "game-hacking"]
+categories = ["games", "parsing"]
 
 [dependencies]
 bitflags = "2.8.0"
