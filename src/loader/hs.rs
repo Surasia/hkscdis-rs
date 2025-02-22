@@ -10,7 +10,7 @@ use crate::{
     common::extensions::{BufReaderExt, HeaderReadable},
 };
 
-use byteorder::{ByteOrder, ReadBytesExt, BE, LE};
+use byteorder::{BE, ByteOrder, LE, ReadBytesExt};
 use colored::Colorize;
 use std::{fmt::Display, fs::File, io::BufReader};
 

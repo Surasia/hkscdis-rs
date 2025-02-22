@@ -1,7 +1,7 @@
 use crate::common::errors::HkscError;
 
 use bitflags::bitflags;
-use byteorder::{ReadBytesExt, BE, LE};
+use byteorder::{BE, LE, ReadBytesExt};
 use colored::Colorize;
 use std::{fmt::Display, fs::File, io::BufReader};
 
